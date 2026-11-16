@@ -15,7 +15,8 @@ if (nrow(incluidos) == 0) {
   doi_url <- ifelse(grepl("^https?://", incluidos$doi), incluidos$doi,
                     paste0("https://doi.org/", sub("^doi:", "", incluidos$doi)))
   link <- ifelse(tem_doi, doi_url, incluidos$url_oa)
-  tit <- htmltools::htmlEscape(incluidos$titulo)
+  tit <- htmltools::htmlEscape(ifelse(is.na(incluidos$titulo) | !nzchar(incluidos$titulo),
+                                      "(sem título)", incluidos$titulo))
   titulo <- ifelse(is.na(link) | !nzchar(link), tit,
                    sprintf("<a href=\"%s\" target=\"_blank\" rel=\"noopener\">%s</a>",
                            htmltools::htmlEscape(link), tit))
@@ -26,6 +27,10 @@ if (nrow(incluidos) == 0) {
                 options = list(pageLength = 25,
                                language = list(search = "Buscar:", lengthMenu = "Mostrar _MENU_",
                                                info = "_START_ a _END_ de _TOTAL_",
+                                               zeroRecords = "Nenhum registro encontrado",
+                                               emptyTable = "Nenhum registro disponível",
+                                               infoEmpty = "0 registros",
+                                               infoFiltered = "(filtrado de _MAX_)",
                                                paginate = list(`next` = "Próxima", previous = "Anterior"))))
 }
 ```

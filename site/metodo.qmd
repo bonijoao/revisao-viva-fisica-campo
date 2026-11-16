@@ -15,6 +15,9 @@ title: "Método"
 4. **Publicação.** O site é reconstruído a cada alteração; todos os números e o diagrama PRISMA 2020
    são recalculados dos três arquivos em `dados/`.
 
+Se os arquivos de dados estiverem inconsistentes, a construção do site falha de propósito e a
+versão publicada anteriormente continua no ar.
+
 ## Limitações
 
 - **Eventos não indexados.** Trabalhos apresentados em eventos que o OpenAlex não indexa

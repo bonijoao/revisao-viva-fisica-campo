@@ -3,6 +3,7 @@ for (f in sort(list.files("../R", pattern = "[.]R$", full.names = TRUE))) {
   source(f, encoding = "UTF-8")
 }
 library(ggplot2)
+options(knitr.kable.NA = "—")
 
 estado <- ler_estado("../dados")
 contagens <- contagens_prisma(estado)

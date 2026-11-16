@@ -94,6 +94,19 @@ test_that("test_desenhar_prisma_roda", {
   expect_false(is.null(g))
 })
 
+test_that("test_diagrama_sem_NA_nem_ingles", {
+  estados <- list(estado_sintetico(),
+                  list(registros = registros_vazio(), decisoes = decisoes_vazio(), rodadas = rodadas_vazio()))
+  for (e in estados) {
+    dot <- desenhar_prisma(contagens_prisma(e))$x$diagram
+    expect_false(grepl("NA)", dot, fixed = TRUE))
+    for (ing in c("Records ", "Registers", "identified from", "removed before", "other reasons")) {
+      expect_false(grepl(ing, dot, fixed = TRUE), info = ing)
+    }
+    expect_true(grepl("Não realizado nesta fase", dot))
+  }
+})
+
 test_that("test_dados_prisma_aritmetica", {
   cp <- contagens_prisma(estado_sintetico())
   d <- dados_prisma(cp)

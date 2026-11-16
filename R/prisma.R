@@ -116,6 +116,8 @@ dados_prisma <- function(contagens) {
   d$total_reports <- f(a$incluidos + n$incluidos)
   d$total_studies_text <- "Total inclu\u00eddo na triagem por t\u00edtulo e resumo"
   d$total_reports_text <- "Total inclu\u00eddo na triagem por t\u00edtulo e resumo"
+  d$register_results_text <- "Registros de outras fontes"
+  d$excluded_other_text <- "Removidos por outros motivos"
   d$identification_text <- "Identifica\u00e7\u00e3o"
   d$screening_text <- "Triagem"
   d$included_text <- "Inclu\u00eddos"
@@ -123,8 +125,18 @@ dados_prisma <- function(contagens) {
 }
 
 # Diagrama PRISMA 2020 (template de revisao atualizada); retorna o widget.
+# Textos fixos em ingles do PRISMA2020 (sem campo para eles) e o sufixo
+# " (n = NA)" das caixas de texto completo sao corrigidos no DOT gerado.
+traduzir_dot_prisma <- function(dot) {
+  dot <- gsub("Records identified from:", "Registros identificados de:", dot, fixed = TRUE)
+  dot <- gsub("Records removed before screening:", "Registros removidos antes da triagem:", dot, fixed = TRUE)
+  # Dicas (tooltips) em ingles: esvaziadas.
+  dot <- gsub("tooltip = \"[^\"]*\"", "tooltip = \"\"", dot)
+  gsub(" (n = NA)", "", dot, fixed = TRUE)
+}
+
 desenhar_prisma <- function(contagens) {
-  withCallingHandlers(
+  g <- withCallingHandlers(
     PRISMA2020::PRISMA_flowdiagram(
       dados_prisma(contagens), previous = TRUE, other = FALSE, interactive = FALSE,
       detail_databases = FALSE, detail_registers = FALSE, side_boxes = TRUE),
@@ -132,4 +144,6 @@ desenhar_prisma <- function(contagens) {
       # Aviso conhecido do PRISMA2020 ("3.5"); outros avisos seguem normalmente.
       if (identical(trimws(conditionMessage(w)), "3.5")) invokeRestart("muffleWarning")
     })
+  g$x$diagram <- traduzir_dot_prisma(g$x$diagram)
+  g
 }
