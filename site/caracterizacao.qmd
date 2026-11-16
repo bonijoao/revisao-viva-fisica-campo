@@ -1,0 +1,73 @@
+---
+title: "Caracterização do corpus"
+---
+
+```{r}
+#| include: false
+source("_setup.R")
+tem <- nrow(incluidos) > 0
+```
+
+```{r}
+if (!tem) cat(MSG_VAZIO, "\n")
+```
+
+```{r}
+#| eval: !expr tem
+#| fig-height: 4
+anos <- as.data.frame(table(ano = incluidos$ano[!is.na(incluidos$ano)]), responseName = "n")
+if (nrow(anos) == 0) {
+  cat("Sem dados.\n")
+} else {
+  ggplot(anos, aes(ano, n)) + geom_col(fill = "#2c7fb8") +
+    labs(x = "Ano", y = "Registros incluídos", title = "Incluídos por ano") + theme_minimal()
+}
+```
+
+```{r}
+#| eval: !expr tem
+#| fig-height: 5
+barras_horizontais(contar_multi(incluidos$fonte, 15), "Top 15 fontes")
+```
+
+```{r}
+#| eval: !expr tem
+#| fig-height: 5
+barras_horizontais(contar_multi(incluidos$instituicoes, 15), "Top 15 instituições")
+```
+
+```{r}
+#| eval: !expr tem
+#| fig-height: 3
+barras_horizontais(contar_multi(incluidos$idioma, 15), "Idiomas")
+```
+
+```{r}
+#| eval: !expr tem
+#| fig-height: 8
+barras_horizontais(contar_multi(incluidos$palavras_chave, 30), "Top 30 palavras-chave")
+```
+
+```{r}
+#| eval: !expr tem
+#| fig-height: 3
+barras_horizontais(contar_multi(incluidos$tipo, 30), "Tipos de documento")
+```
+
+## Resumos que apareceram depois da triagem
+
+Registros com decisão vigente cujo resumo foi atualizado no OpenAlex depois da triagem.
+Vale reavaliar a decisão.
+
+```{r}
+reg <- estado$registros
+tardios <- reg[!is.na(reg$resumo_atualizado_em) & nzchar(reg$resumo_atualizado_em) &
+                 reg$openalex_id %in% vigentes$openalex_id, , drop = FALSE]
+if (nrow(tardios) == 0) {
+  cat("Nenhum caso.\n")
+} else {
+  tardios$decisao <- vigentes$decisao[match(tardios$openalex_id, vigentes$openalex_id)]
+  knitr::kable(tardios[c("titulo", "ano", "decisao", "resumo_atualizado_em")],
+               col.names = c("Título", "Ano", "Decisão vigente", "Resumo atualizado em"))
+}
+```

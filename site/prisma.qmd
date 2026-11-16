@@ -1,0 +1,33 @@
+---
+title: "Fluxo PRISMA 2020"
+---
+
+```{r}
+#| include: false
+source("_setup.R")
+```
+
+```{r}
+desenhar_prisma(contagens)
+```
+
+## Rodadas
+
+```{r}
+if (nrow(estado$rodadas) == 0) {
+  cat("Nenhuma rodada executada ainda.\n")
+} else {
+  knitr::kable(estado$rodadas[setdiff(names(estado$rodadas), c("hash_busca", "hash_regras"))])
+}
+```
+
+## Aguardando triagem por rodada
+
+```{r}
+pend <- contagens$pendentes
+if (NROW(pend) == 0) {
+  cat("Nenhum registro aguardando triagem.\n")
+} else {
+  knitr::kable(pend, col.names = c("Rodada", "Aguardando"))
+}
+```

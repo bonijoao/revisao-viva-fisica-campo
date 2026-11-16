@@ -1,0 +1,24 @@
+---
+title: "Método"
+---
+
+## Como funciona
+
+1. **Busca.** A cada rodada (mensal, ou de linha de base) o pipeline consulta o OpenAlex com as
+   estratégias de busca do protocolo e grava os registros em `dados/registros.csv`.
+2. **Deduplicação e regras.** Registros repetidos são marcados como duplicatas; regras de
+   exclusão automáticas, versionadas em `protocolo/regras.yml`, removem o que está claramente
+   fora do escopo.
+3. **Triagem.** Os candidatos restantes são triados por título e resumo por uma pessoa
+   (com apoio do ASReview quando o volume é grande). As decisões ficam em `dados/decisoes.csv`,
+   que é a fonte da verdade; vale sempre a decisão mais recente.
+4. **Publicação.** O site é reconstruído a cada alteração; todos os números e o diagrama PRISMA 2020
+   são recalculados dos três arquivos em `dados/`.
+
+## Limitações
+
+- **Eventos não indexados.** Trabalhos apresentados em eventos que o OpenAlex não indexa
+  não entram no corpus.
+- **Resumos ausentes.** Parte dos registros não tem resumo, o que dificulta a triagem. Quando o
+  resumo aparece depois, o caso é listado na página de caracterização.
+- **Fonte única.** A busca usa somente o OpenAlex; não há consulta a outras bases.

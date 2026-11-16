@@ -1,0 +1,31 @@
+project:
+  type: website
+
+lang: pt-BR
+
+website:
+  title: "Revisão viva: ensino de física e educação do campo"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Início
+      - href: prisma.qmd
+        text: PRISMA
+      - href: corpus.qmd
+        text: Corpus
+      - href: caracterizacao.qmd
+        text: Caracterização
+      - href: protocolo.qmd
+        text: Protocolo
+      - href: metodo.qmd
+        text: Método
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+
+execute:
+  echo: false
+  warning: false
+  message: false

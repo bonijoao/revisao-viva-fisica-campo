@@ -1,0 +1,31 @@
+---
+title: "Corpus"
+---
+
+```{r}
+#| include: false
+source("_setup.R")
+```
+
+```{r}
+if (nrow(incluidos) == 0) {
+  cat(MSG_VAZIO, "\n")
+} else {
+  tem_doi <- !is.na(incluidos$doi) & nzchar(incluidos$doi)
+  doi_url <- ifelse(grepl("^https?://", incluidos$doi), incluidos$doi,
+                    paste0("https://doi.org/", sub("^doi:", "", incluidos$doi)))
+  link <- ifelse(tem_doi, doi_url, incluidos$url_oa)
+  tit <- htmltools::htmlEscape(incluidos$titulo)
+  titulo <- ifelse(is.na(link) | !nzchar(link), tit,
+                   sprintf("<a href=\"%s\" target=\"_blank\" rel=\"noopener\">%s</a>",
+                           htmltools::htmlEscape(link), tit))
+  tab <- data.frame(Título = titulo, Ano = incluidos$ano, Fonte = incluidos$fonte,
+                    Autores = gsub(";", "; ", incluidos$autores), Idioma = incluidos$idioma,
+                    check.names = FALSE)
+  DT::datatable(tab, escape = FALSE, rownames = FALSE, filter = "top",
+                options = list(pageLength = 25,
+                               language = list(search = "Buscar:", lengthMenu = "Mostrar _MENU_",
+                                               info = "_START_ a _END_ de _TOTAL_",
+                                               paginate = list(`next` = "Próxima", previous = "Anterior"))))
+}
+```

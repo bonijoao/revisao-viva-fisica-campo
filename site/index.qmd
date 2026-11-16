@@ -1,0 +1,20 @@
+---
+title: "Revisão sistemática viva"
+subtitle: "Ensino de física e educação do campo"
+---
+
+```{r}
+#| include: false
+source("_setup.R")
+ultima <- if (nrow(estado$rodadas) > 0) max(estado$rodadas$data, na.rm = TRUE) else NA
+```
+
+Esta revisão é atualizada automaticamente a cada rodada de busca no OpenAlex.
+Os números abaixo são recalculados a partir dos arquivos em `dados/`.
+
+```{r}
+#| results: asis
+cat("- **Última rodada:** ", if (is.na(ultima)) "nenhuma rodada executada ainda" else ultima, "\n", sep = "")
+cat("- **Total de incluídos:** ", nrow(incluidos), "\n", sep = "")
+cat("- **Aguardando triagem:** ", contagens$anterior$aguardando + contagens$nova$aguardando, "\n", sep = "")
+```
