@@ -6,10 +6,24 @@ ARQUIVOS_ESTADO <- c(
 
 ler_tabela <- function(caminho, esquema, vazio) {
   if (!file.exists(caminho)) return(vazio())
+  cab <- names(readr::read_csv(
+    caminho, n_max = 0, col_types = readr::cols(.default = "c"), progress = FALSE
+  ))
+  faltam <- setdiff(names(esquema), cab)
+  sobram <- setdiff(cab, names(esquema))
+  if (length(faltam) > 0 || length(sobram) > 0) {
+    stop(
+      "Colunas invalidas em ", caminho, ". ",
+      if (length(faltam)) paste0("Ausentes: ", paste(faltam, collapse = ", "), ". "),
+      if (length(sobram)) paste0("Inesperadas: ", paste(sobram, collapse = ", "), "."),
+      call. = FALSE
+    )
+  }
+  tipos <- do.call(readr::cols, as.list(esquema[cab]))
   df <- readr::read_csv(
     caminho,
-    col_types = paste(esquema, collapse = ""),
-    na = "", locale = readr::locale(encoding = "UTF-8"),
+    col_types = tipos,
+    na = "", trim_ws = FALSE, locale = readr::locale(encoding = "UTF-8"),
     progress = FALSE
   )
   df <- df[, names(esquema)]

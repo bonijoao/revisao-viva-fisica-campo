@@ -28,10 +28,10 @@ test_that("salvar e ler estado e uma ida e volta identica", {
     "W1", "W2;W3", "10.1/abc", "Ação \"quântica\" de campos", "acao quantica de campos",
     NA_character_, FALSE, NA_character_, 2020L, "article", "en",
     "Rev. Fis.", "A;B", "UFLA;USP", "campo;gauge", "http://x.org",
-    "r1", "incluir", NA_character_, NA_character_
+    "r1", "para_triagem", NA_character_, NA_character_
   )
   dec <- decisoes_vazio()
-  dec[1, ] <- list("W1", "titulo_resumo", "incluir", NA_character_, "humano", "r1", "2026-11-16", "jp")
+  dec[1, ] <- list("W1", "titulo_resumo", "incluir", NA_character_, "issue", "r1", "2026-11-16", "jp")
   rod <- rodadas_vazio()
   rod[1, ] <- list("r1", "2026-11-16", "completo", "h1", "h2", 10L, 1L, 2L, 7L, 7L, 0L, 3L, NA_integer_)
   estado <- list(registros = reg, decisoes = dec, rodadas = rod)
@@ -56,4 +56,48 @@ test_that("salvar_estado grava UTF-8, LF e NA como vazio", {
   expect_identical(strsplit(linhas[1], ",")[[1]], cols_registros)
   bytes <- readBin(file.path(dir, "registros.csv"), "raw", 10000)
   expect_false(any(bytes == as.raw(13)))
+})
+
+test_that("espacos e quebras de linha nas pontas sobrevivem a ida e volta", {
+  dir <- withr::local_tempdir()
+  reg <- registros_vazio()
+  reg[1, ] <- list(
+    "W1", NA, NA, " x ", NA, paste0("linha1", intToUtf8(10), "linha2", intToUtf8(10)),
+    TRUE, NA, 2020L, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA
+  )
+  estado <- list(registros = reg, decisoes = decisoes_vazio(), rodadas = rodadas_vazio())
+  salvar_estado(estado, dir)
+  expect_identical(ler_estado(dir), estado)
+})
+
+test_that("colunas reordenadas no CSV sao lidas pelo nome", {
+  dir <- withr::local_tempdir()
+  dec <- decisoes_vazio()
+  dec[1, ] <- list("W1", "titulo_resumo", "incluir", NA_character_, "issue", "r1", "2026-11-16", "jp")
+  estado <- list(registros = registros_vazio(), decisoes = dec, rodadas = rodadas_vazio())
+  salvar_estado(estado, dir)
+  p <- file.path(dir, "decisoes.csv")
+  d <- readr::read_csv(p, col_types = readr::cols(.default = "c"), na = "")
+  readr::write_csv(d[, rev(names(d))], p, na = "")
+  expect_identical(ler_estado(dir)$decisoes, dec)
+})
+
+test_that("coluna ausente ou extra no CSV gera erro claro", {
+  dir <- withr::local_tempdir()
+  salvar_estado(list(registros = registros_vazio(), decisoes = decisoes_vazio(), rodadas = rodadas_vazio()), dir)
+  p <- file.path(dir, "decisoes.csv")
+  d <- readr::read_csv(p, col_types = readr::cols(.default = "c"))
+  readr::write_csv(d[, setdiff(names(d), "motivo")], p, na = "")
+  expect_error(ler_estado(dir), "motivo")
+  d$motivo <- character(); d$extra <- character()
+  readr::write_csv(d, p, na = "")
+  expect_error(ler_estado(dir), "extra")
+})
+
+test_that("CSVs so com cabecalho sao lidos como tabelas vazias", {
+  dir <- withr::local_tempdir()
+  vazio <- list(registros = registros_vazio(), decisoes = decisoes_vazio(), rodadas = rodadas_vazio())
+  salvar_estado(vazio, dir)
+  expect_true(file.exists(file.path(dir, "registros.csv")))
+  expect_identical(ler_estado(dir), vazio)
 })
