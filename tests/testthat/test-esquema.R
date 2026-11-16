@@ -101,3 +101,15 @@ test_that("CSVs so com cabecalho sao lidos como tabelas vazias", {
   expect_true(file.exists(file.path(dir, "registros.csv")))
   expect_identical(ler_estado(dir), vazio)
 })
+
+test_that("colunas reordenadas em tabela de tipos mistos mantem os tipos", {
+  dir <- withr::local_tempdir()
+  rod <- rodadas_vazio()
+  rod[1, ] <- list("r1", "2026-11-16", "completo", "h1", "h2", 10L, 1L, 2L, 7L, 7L, 0L, 3L, 5L)
+  estado <- list(registros = registros_vazio(), decisoes = decisoes_vazio(), rodadas = rod)
+  salvar_estado(estado, dir)
+  p <- file.path(dir, "rodadas.csv")
+  d <- readr::read_csv(p, col_types = readr::cols(.default = "c"), na = "")
+  readr::write_csv(d[, rev(names(d))], p, na = "")
+  expect_identical(ler_estado(dir)$rodadas, rod)
+})
