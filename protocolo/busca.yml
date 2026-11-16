@@ -1,0 +1,5 @@
+versao: 1
+desde: "2000-01-01"
+blocos:
+  campo: ["educação do campo", "escola do campo", "escolas do campo", "educação rural", "escola rural", "escolas rurais", "licenciatura em educação do campo", "pedagogia da alternância", "PRONERA", "assentamento", "quilombola", "ribeirinha", "educación rural", "escuela rural", "educación del campo", "rural education", "rural school", "rural schools", "countryside education"]
+  fisica: ["física", "ensino de física", "ensino de ciências", "ciências da natureza", "physics", "physics education", "science education", "enseñanza de la física", "enseñanza de las ciencias"]
