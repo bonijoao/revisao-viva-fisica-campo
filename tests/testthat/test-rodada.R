@@ -112,9 +112,63 @@ test_that("test_rodada_decidido_nao_reavaliado", {
   expect_equal(reg$status[reg$openalex_id == alvo], "para_triagem")
   vig <- decisao_vigente(dois$estado$decisoes)
   expect_equal(vig$decisao[vig$openalex_id == alvo], "incluir")
-  # Os pendentes sem decisao humana sao reavaliados pela regra nova.
+  # Pendentes antigos sem decisao humana ja estao em triagem: nao sao reavaliados.
   outros <- setdiff(um$candidatos$openalex_id, alvo)
-  expect_true(all(reg$status[reg$openalex_id %in% outros] == "excluido_regra"))
-  # Mas a contagem da rodada nova so conta linhas da rodada nova.
+  expect_true(all(reg$status[reg$openalex_id %in% outros] == "para_triagem"))
+  expect_true(all(is.na(reg$regra_id[reg$openalex_id %in% outros])))
   expect_equal(dois$estado$rodadas$n_excluidos_regra[2], 0L)
+})
+
+test_that("test_rodada_regras_so_nas_linhas_novas", {
+  um <- rodar(fetcher = function(...) fixture_rodada[1:3, ])
+  regras_novas <- list(versao = 2, regras = list(
+    list(id = "R9", descricao = "exclui tudo", tipo = "ano_menor_que", valor = 3000)
+  ))
+  dois <- rodar(um$estado, data = as.Date("2027-01-01"), regras = regras_novas,
+                fetcher = function(...) fixture_rodada[4:5, ])
+  reg <- dois$estado$registros
+  expect_true(all(reg$status[reg$rodada_identificacao == "2026-12"] == "para_triagem"))
+  expect_true(all(reg$status[reg$rodada_identificacao == "2027-01"] == "excluido_regra"))
+  expect_equal(dois$estado$rodadas$n_excluidos_regra[2], 2L)
+})
+
+test_that("test_rodada_contagens_mistas", {
+  um <- rodar(fetcher = function(...) fixture_rodada[1:3, ])
+  f2 <- fixture_rodada[c(1, 1, 4, 4, 5), ]
+  f2$id[2] <- "https://openalex.org/WDUPEX"    # DOI de um registro existente
+  f2$id[4] <- "https://openalex.org/WDUPLOTE"  # DOI de outra obra do mesmo lote
+  f2$id[5] <- "https://openalex.org/WOFF"      # fora do tema (R2)
+  f2$title[5] <- "Cooking pasta at home"
+  f2$display_name[5] <- "Cooking pasta at home"
+  if ("abstract" %in% names(f2)) f2$abstract[5] <- "Recipes."
+  if ("keywords" %in% names(f2)) f2$keywords[5] <- list(NULL)
+  f2$doi[5] <- "https://doi.org/10.9999/off"
+  dois <- rodar(um$estado, data = as.Date("2027-01-01"), fetcher = function(...) f2)
+  r <- dois$estado$rodadas[2, ]
+  expect_equal(r$n_identificados, 4L)
+  expect_equal(r$n_duplicatas, 2L)
+  expect_equal(r$n_excluidos_regra, 1L)
+  expect_equal(r$n_para_triagem, 1L)
+  reg <- dois$estado$registros
+  expect_equal(reg$regra_id[reg$openalex_id == "WOFF"], "R2")
+  tab <- table(factor(reg$status[reg$rodada_identificacao == "2027-01"],
+                      levels = c("duplicata", "excluido_regra", "para_triagem")))
+  expect_equal(as.integer(tab), c(r$n_duplicatas, r$n_excluidos_regra, r$n_para_triagem))
+  expect_equal(sum(tab), r$n_identificados)
+  expect_equal(dois$candidatos$openalex_id, reg$openalex_id[reg$rodada_identificacao == "2027-01" &
+                                                             reg$status == "para_triagem"])
+})
+
+test_that("test_redigir_segredos", {
+  withr::local_envvar(OPENALEX_API_KEY = "chave-secreta-123", OPENALEX_EMAIL = "fulano@exemplo.org")
+  msg <- paste0("HTTP 500 em https://api.openalex.org/works?filter=x&api_key=abc123&mailto=a%40b.org&page=2",
+                " (chave chave-secreta-123, email fulano@exemplo.org)")
+  out <- redigir_segredos(msg)
+  expect_false(grepl("abc123", out, fixed = TRUE))
+  expect_false(grepl("a%40b.org", out, fixed = TRUE))
+  expect_false(grepl("chave-secreta-123", out, fixed = TRUE))
+  expect_false(grepl("fulano@exemplo.org", out, fixed = TRUE))
+  expect_true(grepl("api_key=***&mailto=***&page=2", out, fixed = TRUE))
+  withr::local_envvar(OPENALEX_API_KEY = "", OPENALEX_EMAIL = "")
+  expect_equal(redigir_segredos("sem segredos"), "sem segredos")
 })

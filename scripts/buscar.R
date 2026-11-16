@@ -44,6 +44,6 @@ principal <- function(args) {
 }
 
 tryCatch(principal(commandArgs(trailingOnly = TRUE)), error = function(e) {
-  message("Erro: ", conditionMessage(e))
+  message("Erro: ", redigir_segredos(conditionMessage(e)))
   quit(status = 1, save = "no")
 })

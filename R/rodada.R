@@ -25,14 +25,15 @@ executar_rodada <- function(estado, busca, regras, modo, data,
     pos <- match(dd$atualizados$openalex_id, registros$openalex_id)
     registros[pos, ] <- dd$atualizados[names(registros)]
   }
-  registros <- tibble::as_tibble(rbind(registros, dd$novos[names(registros_vazio())]))
-
+  # Regras so valem para as linhas novas desta rodada: pendentes antigos ja
+  # estao em triagem humana (issue aberta ou lote do ASReview) e nao mudam.
+  # (deduplicar so devolve em `novos` IDs nunca vistos.)
   decididos <- decisao_vigente(estado$decisoes)$openalex_id
-  registros <- aplicar_regras(registros, .lista_regras(regras), decididos = decididos)
+  novas_linhas <- aplicar_regras(dd$novos[names(registros_vazio())], .lista_regras(regras),
+                                 decididos = decididos)
+  registros <- tibble::as_tibble(rbind(registros, novas_linhas))
 
-  # Linhas acrescentadas nesta rodada (deduplicar so devolve IDs nunca vistos).
-  desta <- registros$openalex_id %in% dd$novos$openalex_id &
-    registros$rodada_identificacao %in% rodada
+  desta <- c(rep(FALSE, nrow(registros) - nrow(novas_linhas)), rep(TRUE, nrow(novas_linhas)))
   st <- registros$status[desta]
   candidatos <- registros[desta & registros$status %in% "para_triagem", ]
 
@@ -97,4 +98,15 @@ escrever_utf8 <- function(texto, caminho) {
   on.exit(close(con))
   writeBin(charToRaw(enc2utf8(paste(texto, collapse = "\n"))), con)
   invisible(caminho)
+}
+
+# Remove segredos de mensagens antes de imprimir: valores de api_key= e
+# mailto= em URLs e qualquer ocorrencia literal da chave ou do e-mail.
+redigir_segredos <- function(x) {
+  x <- gsub("(api_key|mailto)=[^&[:space:]\"']*", "\\1=***", x, perl = TRUE)
+  for (v in c("OPENALEX_API_KEY", "OPENALEX_EMAIL")) {
+    s <- Sys.getenv(v)
+    if (nzchar(s)) x <- gsub(s, "***", x, fixed = TRUE)
+  }
+  x
 }
