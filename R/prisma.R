@@ -36,6 +36,17 @@ somar_contagens <- function(lista) {
 }
 
 contagens_prisma <- function(estado) {
+  if (anyDuplicated(estado$rodadas$rodada)) {
+    stop("rodadas duplicadas em rodadas.csv: ",
+         paste(unique(estado$rodadas$rodada[duplicated(estado$rodadas$rodada)]), collapse = ", "), call. = FALSE)
+  }
+  rid <- estado$registros$rodada_identificacao
+  if (anyNA(rid)) stop("registros sem rodada_identificacao", call. = FALSE)
+  orfas <- setdiff(unique(rid), estado$rodadas$rodada)
+  if (length(orfas) > 0) {
+    stop("registros com rodada_identificacao ausente de rodadas.csv: ",
+         paste(orfas, collapse = ", "), call. = FALSE)
+  }
   rod <- estado$rodadas
   rod <- rod[order(rod$data, seq_len(nrow(rod))), , drop = FALSE]
   vig <- decisao_vigente(estado$decisoes, "titulo_resumo")
@@ -50,15 +61,26 @@ contagens_prisma <- function(estado) {
   list(anterior = anterior, nova = nova, pendentes = pend)
 }
 
-# Diagrama PRISMA 2020 (template de revisao atualizada). Retorna o widget de
-# PRISMA2020::PRISMA_flowdiagram. Rotulos em portugues.
-desenhar_prisma <- function(contagens) {
+# Campos e textos (em portugues) passados ao PRISMA2020::PRISMA_flowdiagram.
+# Identidades: identificados - duplicatas - excluidos_regra == records_screened;
+# records_screened == records_excluded + incluidos + nao_triados_parada + aguardando.
+dados_prisma <- function(contagens) {
   a <- contagens$anterior
   n <- contagens$nova
   nao_feito <- "N\u00e3o realizado nesta fase"
   f <- function(x) as.character(x)
   d <- PRISMA2020::PRISMA_data(utils::read.csv(
     system.file("extdata", "PRISMA.csv", package = "PRISMA2020")))
+
+  partes <- c(
+    if (n$triados > 0) sprintf("%d triados", as.integer(n$triados)),
+    if (n$nao_triados_parada > 0)
+      sprintf("%d n\u00e3o triados por crit\u00e9rio de parada", as.integer(n$nao_triados_parada)),
+    if (n$aguardando > 0) sprintf("%d aguardando triagem", as.integer(n$aguardando)))
+  texto_triados <- "Registros triados (t\u00edtulo e resumo)"
+  if (length(partes) > 0) {
+    texto_triados <- paste0(texto_triados, " (", paste(partes, collapse = "; "), ")")
+  }
 
   d$previous_studies <- f(a$incluidos)
   d$previous_reports <- f(a$incluidos)
@@ -74,12 +96,10 @@ desenhar_prisma <- function(contagens) {
   d$excluded_automatic <- f(n$excluidos_regra)
   d$excluded_automatic_text <- "Exclu\u00eddos por regras autom\u00e1ticas"
   d$excluded_other <- f(0)
-  d$records_screened <- f(n$triados + n$nao_triados_parada)
-  d$records_screened_text <- "Registros triados (t\u00edtulo e resumo)"
-  d$records_excluded <- f(n$excluidos_triagem + n$nao_triados_parada)
-  d$records_excluded_text <- sprintf(
-    "Registros exclu\u00eddos (%d por decis\u00e3o; %d n\u00e3o triados por crit\u00e9rio de parada)",
-    as.integer(n$excluidos_triagem), as.integer(n$nao_triados_parada))
+  d$records_screened <- f(n$identificados - n$duplicatas - n$excluidos_regra)
+  d$records_screened_text <- texto_triados
+  d$records_excluded <- f(n$excluidos_triagem)
+  d$records_excluded_text <- "Registros exclu\u00eddos na triagem"
   for (campo in c("dbr_sought_reports", "dbr_notretrieved_reports", "dbr_assessed")) {
     d[[campo]] <- nao_feito
   }
@@ -99,8 +119,17 @@ desenhar_prisma <- function(contagens) {
   d$identification_text <- "Identifica\u00e7\u00e3o"
   d$screening_text <- "Triagem"
   d$included_text <- "Inclu\u00eddos"
+  d
+}
 
-  suppressWarnings(PRISMA2020::PRISMA_flowdiagram(
-    d, previous = TRUE, other = FALSE, interactive = FALSE,
-    detail_databases = FALSE, detail_registers = FALSE, side_boxes = TRUE))
+# Diagrama PRISMA 2020 (template de revisao atualizada); retorna o widget.
+desenhar_prisma <- function(contagens) {
+  withCallingHandlers(
+    PRISMA2020::PRISMA_flowdiagram(
+      dados_prisma(contagens), previous = TRUE, other = FALSE, interactive = FALSE,
+      detail_databases = FALSE, detail_registers = FALSE, side_boxes = TRUE),
+    warning = function(w) {
+      # Aviso conhecido do PRISMA2020 ("3.5"); outros avisos seguem normalmente.
+      if (identical(trimws(conditionMessage(w)), "3.5")) invokeRestart("muffleWarning")
+    })
 }

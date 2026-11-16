@@ -94,9 +94,48 @@ test_that("test_desenhar_prisma_roda", {
   expect_false(is.null(g))
 })
 
+test_that("test_dados_prisma_aritmetica", {
+  cp <- contagens_prisma(estado_sintetico())
+  d <- dados_prisma(cp)
+  n <- cp$nova
+  num <- function(x) as.numeric(x)
+  expect_equal(num(d$database_results) - num(d$duplicates) - num(d$excluded_automatic),
+               num(d$records_screened))
+  expect_equal(num(d$records_screened),
+               num(d$records_excluded) + num(d$new_studies) + n$nao_triados_parada + n$aguardando)
+  expect_equal(num(d$records_excluded), n$excluidos_triagem)
+  expect_equal(num(d$previous_studies), cp$anterior$incluidos)
+  expect_equal(num(d$new_studies), n$incluidos)
+  expect_equal(d$excluded_automatic_text, "Exclu\u00eddos por regras autom\u00e1ticas")
+  expect_equal(d$new_studies_text, "Inclu\u00eddos na triagem por t\u00edtulo e resumo")
+  expect_equal(d$dbr_sought_reports, "N\u00e3o realizado nesta fase")
+  expect_equal(d$dbr_assessed, "N\u00e3o realizado nesta fase")
+  expect_match(d$records_screened_text, "1 triados", fixed = TRUE)
+  expect_match(d$records_screened_text, "1 n\u00e3o triados por crit\u00e9rio de parada", fixed = TRUE)
+  expect_match(d$records_screened_text, "2 aguardando triagem", fixed = TRUE)
+})
+
+test_that("test_dados_prisma_texto_omite_zeros", {
+  cp <- contagens_prisma(list(registros = registros_vazio(), decisoes = decisoes_vazio(),
+                              rodadas = rodadas_vazio()))
+  d <- dados_prisma(cp)
+  expect_equal(d$records_screened, "0")
+  expect_false(grepl("aguardando|parada", d$records_screened_text))
+})
+
 test_that("test_desenhar_prisma_vazio", {
   cp <- contagens_prisma(list(registros = registros_vazio(), decisoes = decisoes_vazio(),
                               rodadas = rodadas_vazio()))
-  g <- tryCatch(desenhar_prisma(cp), error = function(e) NULL)
-  expect_true(is.null(g) || !is.null(g))  # nao deve propagar erro
+  expect_no_error(g <- desenhar_prisma(cp))
+  expect_false(is.null(g))
+})
+
+test_that("test_contagens_rodada_inconsistente", {
+  est <- estado_sintetico()
+  e1 <- est; e1$registros$rodada_identificacao[1] <- "9999-99"
+  expect_error(contagens_prisma(e1), "9999-99")
+  e2 <- est; e2$registros$rodada_identificacao[1] <- NA
+  expect_error(contagens_prisma(e2), "sem rodada")
+  e3 <- est; e3$rodadas <- rbind(est$rodadas, est$rodadas[1, ])
+  expect_error(contagens_prisma(e3), "duplicad")
 })
