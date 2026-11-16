@@ -1,0 +1,120 @@
+name: buscar
+on:
+  schedule:
+    - cron: "0 9 1 * *"
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: "Modo da busca"
+        type: choice
+        options: [mensal, linha_de_base]
+        default: mensal
+      issue_rodada:
+        description: "Opcional: so (re)criar a issue desta rodada, a partir de triagem/issue-<rodada>.md ja commitado (sem buscar)"
+        type: string
+        required: false
+permissions:
+  contents: write
+  issues: write
+  actions: write
+concurrency:
+  group: estado-dados
+  cancel-in-progress: false
+jobs:
+  buscar:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      OPENALEX_EMAIL: ${{ secrets.OPENALEX_EMAIL }}
+      OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
+      MODO: ${{ inputs.modo || 'mensal' }}
+      ISSUE_RODADA: ${{ inputs.issue_rodada }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          needs: check
+      - name: Buscar
+        id: buscar
+        if: env.ISSUE_RODADA == ''
+        run: Rscript scripts/buscar.R "$MODO"
+      - name: Commit do estado
+        if: env.ISSUE_RODADA == ''
+        env:
+          RODADA: ${{ steps.buscar.outputs.rodada }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A dados triagem
+          if git diff --cached --quiet; then
+            echo "Nada a commitar."
+          else
+            git commit -m "dados: rodada ${RODADA}"
+            git pull --rebase
+            git push
+          fi
+      - name: Definir rodada, destino e arquivo
+        id: alvo
+        env:
+          B_RODADA: ${{ steps.buscar.outputs.rodada }}
+          B_DESTINO: ${{ steps.buscar.outputs.destino }}
+          B_N: ${{ steps.buscar.outputs.n }}
+          B_ARQUIVO: ${{ steps.buscar.outputs.arquivo }}
+        run: |
+          if [ -n "$ISSUE_RODADA" ]; then
+            arquivo="triagem/issue-${ISSUE_RODADA}.md"
+            if [ -f "$arquivo" ]; then
+              n=$(grep -c '<!-- id:' "$arquivo" || true)
+              destino=issue
+            elif [ -f "triagem/asreview/${ISSUE_RODADA}.csv" ]; then
+              arquivo="triagem/asreview/${ISSUE_RODADA}.csv"
+              n=$(( $(wc -l < "$arquivo") - 1 ))
+              destino=asreview
+            else
+              echo "Nenhum material de triagem para a rodada ${ISSUE_RODADA}." >&2
+              exit 1
+            fi
+            rodada="$ISSUE_RODADA"
+          else
+            rodada="$B_RODADA"; destino="$B_DESTINO"; n="$B_N"; arquivo="$B_ARQUIVO"
+          fi
+          {
+            echo "rodada=${rodada}"
+            echo "destino=${destino}"
+            echo "n=${n}"
+            echo "arquivo=${arquivo}"
+          } >> "$GITHUB_OUTPUT"
+      - name: Criar issue de triagem
+        if: steps.alvo.outputs.destino == 'issue'
+        env:
+          RODADA: ${{ steps.alvo.outputs.rodada }}
+          N: ${{ steps.alvo.outputs.n }}
+          ARQUIVO: ${{ steps.alvo.outputs.arquivo }}
+        run: |
+          gh issue create \
+            --title "Triagem ${RODADA} — ${N} registros" \
+            --label triagem \
+            --body-file "$ARQUIVO"
+      - name: Criar issue do ASReview
+        if: steps.alvo.outputs.destino == 'asreview'
+        env:
+          RODADA: ${{ steps.alvo.outputs.rodada }}
+          N: ${{ steps.alvo.outputs.n }}
+        run: |
+          cat > "$RUNNER_TEMP/corpo-asreview.md" <<EOT
+          Esta rodada tem registros demais para a triagem manual na issue, então a triagem é feita no ASReview.
+
+          1. Baixe o arquivo \`triagem/asreview/${RODADA}.csv\` deste repositório.
+          2. Faça a triagem no ASReview e exporte o resultado.
+          3. Suba a exportação para \`triagem/asreview/importar/${RODADA}.csv\` (o nome do arquivo deve ser exatamente \`${RODADA}.csv\`).
+
+          Ao subir o arquivo, um workflow importa as decisões e atualiza o estado da revisão automaticamente.
+          EOT
+          gh issue create \
+            --title "Triagem ${RODADA} — ASReview (${N} registros)" \
+            --body-file "$RUNNER_TEMP/corpo-asreview.md"
+      - name: Disparar site
+        run: gh workflow run site.yml

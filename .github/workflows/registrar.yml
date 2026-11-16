@@ -1,0 +1,58 @@
+name: registrar
+on:
+  issues:
+    types: [closed]
+permissions:
+  contents: write
+  issues: write
+  actions: write
+concurrency:
+  group: estado-dados
+  cancel-in-progress: false
+jobs:
+  registrar:
+    if: contains(github.event.issue.labels.*.name, 'triagem')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          needs: check
+      - name: Registrar decisões
+        id: registrar
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REVISOR: ${{ github.event.sender.login }}
+        run: |
+          printf '%s\n' "$ISSUE_BODY" > "$RUNNER_TEMP/corpo.md"
+          Rscript scripts/registrar_issue.R "$RUNNER_TEMP/corpo.md" "$ISSUE_NUMBER" "$REVISOR"
+      - name: Commit do estado
+        env:
+          RODADA: ${{ steps.registrar.outputs.rodada }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A dados
+          if git diff --cached --quiet; then
+            echo "Nada a commitar."
+          else
+            git commit -m "dados: triagem ${RODADA} (issue #${ISSUE_NUMBER})"
+            git pull --rebase
+            git push
+          fi
+      - name: Comentar resumo
+        env:
+          RESUMO: ${{ steps.registrar.outputs.resumo }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          gh issue comment "$ISSUE_NUMBER" --body "Decisões registradas: ${RESUMO}."
+      - name: Disparar site
+        run: gh workflow run site.yml

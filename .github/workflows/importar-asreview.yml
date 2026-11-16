@@ -1,0 +1,64 @@
+name: importar-asreview
+on:
+  push:
+    paths:
+      - "triagem/asreview/importar/**"
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: estado-dados
+  cancel-in-progress: false
+jobs:
+  importar:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BEFORE: ${{ github.event.before }}
+      SHA: ${{ github.sha }}
+      REVISOR: ${{ github.actor }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          needs: check
+      - name: Importar arquivos novos
+        id: importar
+        run: |
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            base=$(git hash-object -t tree /dev/null)
+          else
+            base="$BEFORE"
+          fi
+          git diff --name-only --diff-filter=A "$base" "$SHA" -- triagem/asreview/importar/ > "$RUNNER_TEMP/novos.txt"
+          rodadas=""
+          while IFS= read -r arquivo; do
+            case "$arquivo" in *.csv) ;; *) continue ;; esac
+            Rscript scripts/importar_asreview.R "$arquivo" "$REVISOR"
+            r=$(basename "$arquivo" .csv)
+            rodadas="${rodadas:+$rodadas, }$r"
+          done < "$RUNNER_TEMP/novos.txt"
+          echo "rodadas=${rodadas}" >> "$GITHUB_OUTPUT"
+      - name: Commit do estado
+        if: steps.importar.outputs.rodadas != ''
+        env:
+          RODADAS: ${{ steps.importar.outputs.rodadas }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A dados triagem
+          if git diff --cached --quiet; then
+            echo "Nada a commitar."
+          else
+            git commit -m "dados: importação ASReview ${RODADAS}"
+            git pull --rebase
+            git push
+          fi
+      - name: Disparar site
+        if: steps.importar.outputs.rodadas != ''
+        run: gh workflow run site.yml
