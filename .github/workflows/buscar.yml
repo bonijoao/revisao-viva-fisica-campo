@@ -18,15 +18,13 @@ permissions:
   issues: write
   actions: write
 concurrency:
-  group: estado-dados
+  group: busca
   cancel-in-progress: false
 jobs:
   buscar:
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
-      OPENALEX_EMAIL: ${{ secrets.OPENALEX_EMAIL }}
-      OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
       MODO: ${{ inputs.modo || 'mensal' }}
       ISSUE_RODADA: ${{ inputs.issue_rodada }}
     steps:
@@ -40,6 +38,9 @@ jobs:
       - name: Buscar e commitar estado
         id: buscar
         if: env.ISSUE_RODADA == ''
+        env:
+          OPENALEX_EMAIL: ${{ secrets.OPENALEX_EMAIL }}
+          OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -129,7 +130,7 @@ jobs:
           Esta rodada tem registros demais para a triagem manual na issue, então a triagem é feita no ASReview.
 
           1. Baixe o arquivo \`triagem/asreview/${RODADA}.csv\` deste repositório.
-          2. Faça a triagem no ASReview e exporte o resultado.
+          2. Faça a triagem no ASReview e exporte TODOS os registros (não só os relevantes), em CSV.
           3. Suba a exportação para \`triagem/asreview/importar/${RODADA}.csv\` (o nome do arquivo deve ser exatamente \`${RODADA}.csv\`).
 
           Ao subir o arquivo, um workflow importa as decisões e atualiza o estado da revisão automaticamente.
@@ -138,4 +139,5 @@ jobs:
             --title "Triagem ${RODADA} — ASReview (${N} registros)" \
             --body-file "$RUNNER_TEMP/corpo-asreview.md"
       - name: Disparar site
+        if: steps.alvo.outputs.rodada != ''
         run: gh workflow run site.yml
