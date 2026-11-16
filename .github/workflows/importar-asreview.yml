@@ -1,6 +1,7 @@
 name: importar-asreview
 on:
   push:
+    branches: [main]
     paths:
       - "triagem/asreview/importar/**"
 permissions:
@@ -27,9 +28,11 @@ jobs:
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           needs: check
-      - name: Importar arquivos novos
+      - name: Importar arquivos novos e commitar estado
         id: importar
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
             base=$(git hash-object -t tree /dev/null)
           else
@@ -37,28 +40,40 @@ jobs:
           fi
           git diff --name-only --diff-filter=A "$base" "$SHA" -- triagem/asreview/importar/ > "$RUNNER_TEMP/novos.txt"
           rodadas=""
-          while IFS= read -r arquivo; do
-            case "$arquivo" in *.csv) ;; *) continue ;; esac
-            Rscript scripts/importar_asreview.R "$arquivo" "$REVISOR"
-            r=$(basename "$arquivo" .csv)
-            rodadas="${rodadas:+$rodadas, }$r"
-          done < "$RUNNER_TEMP/novos.txt"
-          echo "rodadas=${rodadas}" >> "$GITHUB_OUTPUT"
-      - name: Commit do estado
-        if: steps.importar.outputs.rodadas != ''
-        env:
-          RODADAS: ${{ steps.importar.outputs.rodadas }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A dados triagem
-          if git diff --cached --quiet; then
-            echo "Nada a commitar."
-          else
-            git commit -m "dados: importação ASReview ${RODADAS}"
-            git pull --rebase
-            git push
+          importar_todos() {
+            rodadas=""
+            while IFS= read -r arquivo; do
+              case "$arquivo" in *.csv) ;; *) continue ;; esac
+              [ -f "$arquivo" ] || continue
+              Rscript scripts/importar_asreview.R "$arquivo" "$REVISOR"
+              rodadas="${rodadas:+$rodadas, }$(basename "$arquivo" .csv)"
+            done < "$RUNNER_TEMP/novos.txt"
+          }
+          ok=0
+          for tentativa in 1 2 3; do
+            importar_todos
+            git add -A -- dados
+            if [ -d triagem ]; then git add -A -- triagem; fi
+            if git diff --cached --quiet; then
+              echo "Nada a commitar."
+              ok=1
+              break
+            fi
+            git commit -m "dados: importação ASReview ${rodadas}"
+            if git pull --rebase && git push; then
+              ok=1
+              break
+            fi
+            echo "Falha ao enviar (tentativa ${tentativa}); refazendo sobre o estado remoto."
+            git rebase --abort 2>/dev/null || true
+            git fetch origin
+            git reset --hard "origin/${GITHUB_REF_NAME}"
+          done
+          if [ "$ok" != 1 ]; then
+            echo "Não foi possível enviar o estado após 3 tentativas." >&2
+            exit 1
           fi
+          echo "rodadas=${rodadas}" >> "$GITHUB_OUTPUT"
       - name: Disparar site
         if: steps.importar.outputs.rodadas != ''
         run: gh workflow run site.yml
