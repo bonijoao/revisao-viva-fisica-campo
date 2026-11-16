@@ -1,1 +1,153 @@
-Protocolo em elaboração.
+```{r}
+#| include: false
+# Este arquivo é incluído por site/protocolo.qmd; o diretório de trabalho é site/.
+busca <- yaml::read_yaml("../protocolo/busca.yml")
+regras <- yaml::read_yaml("../protocolo/regras.yml")
+```
+
+## Protocolo de revisão sistemática viva: ensino de física e educação do campo
+
+Protocolo no padrão PRISMA-P 2015 (Shamseer et al., 2015, *BMJ*, 349:g7647). O relato da revisão seguirá o PRISMA 2020 (Page et al., 2021, *BMJ*, 372:n71), no modelo para revisões atualizadas.
+
+**Registro:** não registrado ainda (OSF ou similar).
+
+**Versão da string de busca:** `r busca$versao`. **Versão das regras:** `r regras$versao`.
+
+### Informações administrativas
+
+**Autor e responsável:** João Paulo Assis Bonifácio, Licenciatura em Física, Universidade Federal de Itajubá (UNIFEI). Contato: a definir.
+
+**Orientador do TCC que originou o tema:** Newton de Figueiredo Filho.
+
+**Apoio e financiamento:** a definir (nenhum declarado até o momento). **Papel de financiadores:** não se aplica.
+
+### Emendas
+
+Toda mudança na string de busca, nas regras de exclusão ou nos critérios é registrada aqui. Uma emenda de regra ou de termo vale **apenas para os registros identificados a partir da rodada da emenda**; os registros de rodadas anteriores já estão em triagem humana e não são reavaliados.
+
+| Data | Seção alterada | Descrição da mudança | Justificativa | Rodada de início |
+|------|----------------|----------------------|---------------|------------------|
+|      |                |                      |               |                  |
+
+## Introdução
+
+### Justificativa
+
+O Trabalho de Conclusão de Curso do autor, na Licenciatura em Física da UNIFEI, analisou à mão os referenciais teóricos dos trabalhos sobre educação do campo apresentados no Simpósio Nacional de Ensino de Física (SNEF), de 2000 a 2019. Esta revisão amplia o recorte para o **ensino de física e a educação do campo em geral**, sem se limitar ao SNEF.
+
+O tema já é conhecido pelo autor, que consegue reconhecer o que deveria aparecer nos resultados. Por isso ele serve de **teste de método**: verificar se uma revisão sistemática viva, com busca mensal automatizada e triagem humana, funciona e é reproduzível. Uma revisão viva é atualizada de forma contínua, à medida que novos estudos aparecem.
+
+### Pergunta e objetivos
+
+**Pergunta:** o que a literatura indexada relata sobre o ensino de física (e de ciências da natureza) em contextos de educação do campo, quanto a práticas, referenciais teóricos e desafios?
+
+Estrutura PICOS adaptada à educação:
+
+- **P (população):** estudantes, professores e escolas do campo.
+- **I (exposição):** ensino de física e de ciências da natureza.
+- **C (comparador):** não se aplica.
+- **O (desfechos):** práticas de ensino, referenciais teóricos e desafios relatados.
+- **S (desenho do estudo):** qualquer desenho (empírico, relato de experiência ou teórico), desde que publicado e indexado.
+
+Nesta fase a revisão faz a **busca, a triagem por título e resumo e a caracterização do corpus por metadados**. A análise de conteúdo (extração dos referenciais teóricos a partir do texto completo) fica para uma fase posterior.
+
+## Métodos
+
+### Critérios de elegibilidade
+
+| Critério | Incluir | Excluir |
+|----------|---------|---------|
+| Tema | Ensino de física ou de ciências da natureza em contexto de educação do campo, rural, de assentamentos, quilombola, ribeirinha ou de alternância | Trabalhos sem relação com física/ciências ou sem relação com educação do campo |
+| Desenho | Qualquer: empírico, relato de experiência, teórico | Sem restrição de desenho |
+| Tipo de documento | Artigos, trabalhos de eventos, teses, dissertações, capítulos | Errata, editorial, paratexto, conjunto de dados, retratação, parecer |
+| Período | Publicados a partir de 2000 | Publicados antes de 2000 |
+| Idioma | Português, espanhol e inglês (por meio dos termos da busca) | Demais idiomas |
+| Situação da publicação | Publicado e indexado na fonte | Não indexado |
+
+A decisão final de inclusão é sempre humana. Nesta fase ela se baseia em título e resumo.
+
+### Fontes de informação e limitações
+
+Fonte única: **OpenAlex** (via pacote `openalexR` do R). Outras bases são possíveis no futuro; a BDTD é a candidata seguinte.
+
+Limitações declaradas:
+
+- **Anais de eventos não indexados** (por exemplo SNEF, EPEF e ENPEC) têm cobertura incompleta ou nula. Isto é uma limitação do método, não um defeito.
+- Muitos registros brasileiros vêm **sem resumo** no OpenAlex; nesses casos a triagem é feita pelo título e isso fica registrado (`tem_resumo = FALSE`).
+- Uma única fonte pode deixar de recuperar trabalhos relevantes.
+
+### Estratégia de busca
+
+A busca combina dois blocos, ligados por **AND**; dentro de cada bloco, os termos são ligados por **OR**. Os termos estão em português, espanhol e inglês e são pesquisados no título e no resumo, a partir de `r busca$desde`. A busca completa é refeita a cada rodada, e "novo" significa "identificador nunca visto antes".
+
+String vigente, lida de `protocolo/busca.yml`:
+
+```{r}
+#| results: asis
+for (nome in names(busca$blocos)) {
+  cat("**Bloco `", nome, "`:**\n\n", sep = "")
+  cat("> ", paste0('"', unlist(busca$blocos[[nome]]), '"', collapse = " OR "), "\n\n", sep = "")
+}
+cat("**Combinação:** ", paste0("(bloco ", names(busca$blocos), ")", collapse = " AND "), "\n\n", sep = "")
+```
+
+### Regras de exclusão automática
+
+Regras só **excluem** o que é claramente fora do tema; nunca incluem. Na dúvida, o registro segue para triagem humana. O identificador da regra fica registrado em cada exclusão. Regras vigentes, lidas de `protocolo/regras.yml`:
+
+```{r}
+#| results: asis
+for (r in regras$regras) {
+  det <- switch(r$tipo,
+    tipo_em = paste0("tipos: ", paste(unlist(r$valores), collapse = ", ")),
+    nenhum_termo = paste0("nenhum dos termos (", paste(unlist(r$termos), collapse = ", "),
+                          ") em: ", paste(unlist(r$campos), collapse = ", ")),
+    ano_menor_que = paste0("ano < ", r$valor),
+    "")
+  cat("- **", r$id, "**: ", r$descricao, " (", det, ")\n", sep = "")
+}
+cat("\n")
+```
+
+A comparação de termos ignora acentos e maiúsculas.
+
+### Registros e processo de seleção
+
+**Gestão de dados:** os registros, as decisões e as rodadas ficam em arquivos CSV versionados no Git (`registros.csv`, `decisoes.csv`, `rodadas.csv`); todos os números do diagrama PRISMA são recalculados a partir deles.
+
+**Deduplicação** (nesta ordem): identificador do OpenAlex; DOI normalizado; título normalizado mais ano.
+
+**Triagem por título e resumo:** feita por uma única pessoa (o autor); nenhuma decisão de inclusão é automatizada.
+
+- **Linha de base:** a primeira busca completa é triada no ASReview LAB, no computador do autor.
+- **Rodadas mensais:** cada rodada abre uma issue no GitHub com uma caixa de seleção por registro; marcado = incluir, desmarcado = excluir; fechar a issue finaliza a rodada. Se uma rodada vier grande demais para uma issue, ela é triada pela via do ASReview.
+
+Há uma única decisão vigente por registro e etapa (a mais recente vence). Texto completo e extração de dados **não se aplicam nesta fase**.
+
+### Regra de parada da linha de base
+
+O tamanho real da linha de base só é conhecido depois da busca. A escolha entre as duas regras abaixo é feita **depois** de ver esse tamanho e registrada como emenda:
+
+- **Até cerca de 800 registros:** triar todos, sem regra de parada.
+- **Acima disso:** parar quando pelo menos **25%** dos registros tiverem sido vistos **e** houver **50 registros irrelevantes seguidos**.
+
+Os registros que sobrarem sem rótulo são gravados como **"não triados (critério de parada)"**, aparecem em caixa própria no diagrama PRISMA e **nunca** contam como excluídos. A mesma regra vale para uma rodada mensal que ultrapasse o limite de uma issue.
+
+### Itens de dados
+
+Nesta fase, apenas metadados do OpenAlex: identificador, DOI, título, resumo, ano, tipo de documento, idioma, fonte (periódico ou evento), autores, instituições, palavras-chave e link de acesso aberto.
+
+### Risco de viés, síntese e confiança na evidência
+
+Avaliação de risco de viés: **não se aplica nesta fase**. Meta-análise, avaliação de viés de publicação e GRADE: **não se aplicam**. A síntese desta fase é descritiva: diagrama PRISMA e caracterização do corpus incluído por metadados.
+
+### Atualização e encerramento
+
+**Frequência:** mensal, automática (dia 1), com disparo manual possível.
+
+**Critério de encerramento da revisão viva:** a definir pelo autor.
+
+## Referências
+
+- Shamseer, L. et al. (2015). Preferred reporting items for systematic review and meta-analysis protocols (PRISMA-P) 2015: elaboration and explanation. *BMJ*, 349, g7647.
+- Page, M. J. et al. (2021). The PRISMA 2020 statement: an updated guideline for reporting systematic reviews. *BMJ*, 372, n71.
