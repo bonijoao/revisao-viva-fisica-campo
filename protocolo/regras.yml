@@ -1,0 +1,20 @@
+versao: 1
+regras:
+  - id: R1
+    descricao: "Tipo de documento fora do escopo"
+    tipo: tipo_em
+    valores: [erratum, editorial, paratext, dataset, retraction, peer-review]
+  - id: R2
+    descricao: "Sem termo de física ou de ensino de ciências"
+    tipo: nenhum_termo
+    campos: [titulo, resumo, palavras_chave]
+    termos: [fisic, physic, ciencias da natureza, ensino de ciencias, science education, ensenanza de las ciencias]
+  - id: R3
+    descricao: "Sem termo de educação do campo"
+    tipo: nenhum_termo
+    campos: [titulo, resumo, palavras_chave]
+    termos: [campo, rural, assentament, quilombol, ribeirinh, alternancia, pronera, ledoc, countryside]
+  - id: R4
+    descricao: "Publicado antes de 2000"
+    tipo: ano_menor_que
+    valor: 2000
