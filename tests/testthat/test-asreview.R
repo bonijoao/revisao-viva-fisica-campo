@@ -26,8 +26,13 @@ test_that("rotulo em outras colunas e texto", {
 
 test_that("test_asreview_id_ausente", {
   ex <- tibble::tibble(openalex_id = "W1", included = 1)
+  expect_error(importar_asreview(ex, c("W1", "W9"), "2026-12", "2026-12-05", "r"),
+               "1 registro.*TODOS")
+})
+
+test_that("id presente mas sem rotulo vira parada", {
+  ex <- tibble::tibble(openalex_id = c("W1", "W9"), included = c(1, NA))
   d <- importar_asreview(ex, c("W1", "W9"), "2026-12", "2026-12-05", "r")
-  expect_equal(d$openalex_id, c("W1", "W9"))
   expect_equal(d$decisao, c("incluir", "nao_triado_parada"))
 })
 

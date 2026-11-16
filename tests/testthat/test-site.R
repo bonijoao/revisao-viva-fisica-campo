@@ -42,7 +42,7 @@ test_that("test_site_renderiza com estado cheio", {
   skip_if(Sys.which("quarto") == "")
   busca <- yaml::read_yaml(file.path("..", "..", "protocolo", "busca.yml"))
   regras <- yaml::read_yaml(file.path("..", "..", "protocolo", "regras.yml"))
-  out <- executar_rodada(estado_vazio_site(), busca, regras, modo = "mensal",
+  out <- executar_rodada(estado_com_base(), busca, regras, modo = "mensal",
                          data = as.Date("2026-12-01"),
                          fetcher = function(...) fixture_site, limite = 50)
   est <- out$estado

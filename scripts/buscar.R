@@ -24,22 +24,21 @@ principal <- function(args) {
   regras <- yaml::read_yaml(file.path("protocolo", "regras.yml"))
   hoje <- as.Date(format(Sys.time(), "%Y-%m-%d", tz = "UTC"))
 
+  if (identical(modo, "mensal") && !"linha-de-base" %in% estado$rodadas$rodada) {
+    message("Aviso: a linha de base ainda não foi executada; nada a fazer nesta rodada mensal. ",
+            "Rode o workflow com modo linha_de_base.")
+    escrever_saida_gha(rodada = "", destino = "nenhum", n = 0, arquivo = "")
+    return(invisible())
+  }
+
   out <- executar_rodada(estado, busca, regras, modo = modo, data = hoje, fetcher = fetcher)
   rodada <- out$estado$rodadas$rodada[nrow(out$estado$rodadas)]
 
-  arquivo <- ""
-  if (out$destino == "issue") {
-    corpo <- montar_corpo_issue(out$candidatos, rodada)
-    arquivo <- file.path("triagem", paste0("issue-", rodada, ".md"))
-    escrever_utf8(corpo, arquivo)
-  } else if (out$destino == "asreview") {
-    arquivo <- file.path("triagem", "asreview", paste0(rodada, ".csv"))
-    dir.create(dirname(arquivo), showWarnings = FALSE, recursive = TRUE)
-    exportar_asreview(out$candidatos, arquivo)
-  }
+  mat <- preparar_material(out$destino, out$candidatos, rodada)
+  arquivo <- mat$arquivo
 
   salvar_estado(out$estado, "dados")
-  escrever_saida_gha(rodada = rodada, destino = out$destino,
+  escrever_saida_gha(rodada = rodada, destino = mat$destino,
                      n = nrow(out$candidatos), arquivo = arquivo)
 }
 

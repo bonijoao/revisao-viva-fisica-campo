@@ -9,7 +9,7 @@ estado_vazio <- function() {
   list(registros = registros_vazio(), decisoes = decisoes_vazio(), rodadas = rodadas_vazio())
 }
 
-rodar <- function(estado = estado_vazio(), modo = "mensal", data = as.Date("2026-12-01"),
+rodar <- function(estado = estado_com_base(), modo = "mensal", data = as.Date("2026-12-01"),
                   regras = regras_yml, fetcher = fetcher_falso, limite = 50) {
   executar_rodada(estado, busca_yml, regras, modo = modo, data = data,
                   fetcher = fetcher, limite = limite)
@@ -18,7 +18,8 @@ rodar <- function(estado = estado_vazio(), modo = "mensal", data = as.Date("2026
 test_that("test_rodada_primeira_vez", {
   out <- rodar()
   r <- out$estado$rodadas
-  expect_equal(nrow(r), 1)
+  expect_equal(nrow(r), 2)
+  r <- r[2, ]
   expect_equal(r$rodada, "2026-12")
   expect_equal(r$modo, "mensal")
   expect_equal(r$n_identificados, nrow(fixture_rodada))
@@ -39,16 +40,16 @@ test_that("test_rodada_segunda_vez_sem_novos", {
   um <- rodar()
   dois <- rodar(um$estado, data = as.Date("2027-01-01"))
   r <- dois$estado$rodadas
-  expect_equal(nrow(r), 2)
-  expect_equal(r$rodada[2], "2027-01")
-  expect_equal(r$n_identificados[2], 0L)
+  expect_equal(nrow(r), 3)
+  expect_equal(r$rodada[3], "2027-01")
+  expect_equal(r$n_identificados[3], 0L)
   expect_equal(nrow(dois$candidatos), 0)
   expect_equal(dois$destino, "nenhum")
   expect_equal(nrow(dois$estado$registros), nrow(um$estado$registros))
 })
 
 test_that("test_rodada_linha_de_base_vai_para_asreview", {
-  out <- rodar(modo = "linha_de_base")
+  out <- rodar(estado_vazio(), modo = "linha_de_base")
   expect_equal(out$estado$rodadas$rodada, "linha-de-base")
   expect_gt(nrow(out$candidatos), 0)
   expect_equal(out$destino, "asreview")
@@ -70,7 +71,7 @@ copiar_repo <- function() {
 }
 
 test_that("test_rodada_erro_fetcher_nao_altera_estado", {
-  est <- estado_vazio()
+  est <- estado_com_base()
   expect_error(rodar(est, fetcher = fetcher_falha), "fora do ar")
 
   tmp <- copiar_repo()
@@ -116,7 +117,7 @@ test_that("test_rodada_decidido_nao_reavaliado", {
   outros <- setdiff(um$candidatos$openalex_id, alvo)
   expect_true(all(reg$status[reg$openalex_id %in% outros] == "para_triagem"))
   expect_true(all(is.na(reg$regra_id[reg$openalex_id %in% outros])))
-  expect_equal(dois$estado$rodadas$n_excluidos_regra[2], 0L)
+  expect_equal(dois$estado$rodadas$n_excluidos_regra[3], 0L)
 })
 
 test_that("test_rodada_regras_so_nas_linhas_novas", {
@@ -129,7 +130,7 @@ test_that("test_rodada_regras_so_nas_linhas_novas", {
   reg <- dois$estado$registros
   expect_true(all(reg$status[reg$rodada_identificacao == "2026-12"] == "para_triagem"))
   expect_true(all(reg$status[reg$rodada_identificacao == "2027-01"] == "excluido_regra"))
-  expect_equal(dois$estado$rodadas$n_excluidos_regra[2], 2L)
+  expect_equal(dois$estado$rodadas$n_excluidos_regra[3], 2L)
 })
 
 test_that("test_rodada_contagens_mistas", {
@@ -144,7 +145,7 @@ test_that("test_rodada_contagens_mistas", {
   if ("keywords" %in% names(f2)) f2$keywords[5] <- list(NULL)
   f2$doi[5] <- "https://doi.org/10.9999/off"
   dois <- rodar(um$estado, data = as.Date("2027-01-01"), fetcher = function(...) f2)
-  r <- dois$estado$rodadas[2, ]
+  r <- dois$estado$rodadas[3, ]
   expect_equal(r$n_identificados, 4L)
   expect_equal(r$n_duplicatas, 2L)
   expect_equal(r$n_excluidos_regra, 1L)
@@ -171,4 +172,64 @@ test_that("test_redigir_segredos", {
   expect_true(grepl("api_key=***&mailto=***&page=2", out, fixed = TRUE))
   withr::local_envvar(OPENALEX_API_KEY = "", OPENALEX_EMAIL = "")
   expect_equal(redigir_segredos("sem segredos"), "sem segredos")
+})
+
+test_that("test_rodada_mensal_sem_linha_de_base_erro", {
+  expect_error(rodar(estado_vazio(), modo = "mensal"), "linha de base ainda não foi executada")
+})
+
+test_that("test_rodada_linha_de_base_com_estado_nao_vazio_erro", {
+  expect_error(rodar(estado_com_base(), modo = "linha_de_base"), "linha de base")
+  um <- rodar()
+  expect_error(rodar(um$estado, modo = "linha_de_base", data = as.Date("2027-02-01")), "linha de base")
+})
+
+test_that("test_script_mensal_sem_linha_de_base_sai_0_sem_escrever", {
+  tmp <- copiar_repo()
+  on.exit(unlink(tmp, recursive = TRUE), add = TRUE)
+  unlink(list.files(file.path(tmp, "dados"), full.names = TRUE))
+  salvar_estado(estado_vazio(), file.path(tmp, "dados"))
+  saida <- tempfile()
+  csvs <- file.path(tmp, "dados", c("registros.csv", "decisoes.csv", "rodadas.csv"))
+  antes <- lapply(csvs, function(f) readBin(f, "raw", file.info(f)$size))
+  res <- callr::rscript(
+    file.path("scripts", "buscar.R"), cmdargs = "mensal", wd = tmp,
+    env = c(callr::rcmd_safe_env(), REVISAO_FETCHER_FALHA = "1", GITHUB_OUTPUT = saida),
+    fail_on_status = FALSE, show = FALSE
+  )
+  expect_equal(res$status, 0L)
+  expect_match(res$stderr, "linha de base")
+  expect_true("destino=nenhum" %in% readLines(saida))
+  depois <- lapply(csvs, function(f) readBin(f, "raw", file.info(f)$size))
+  expect_identical(depois, antes)
+  expect_false(dir.exists(file.path(tmp, "triagem")))
+})
+
+test_that("test_script_linha_de_base_com_estado_nao_vazio_sai_1", {
+  tmp <- copiar_repo()
+  on.exit(unlink(tmp, recursive = TRUE), add = TRUE)
+  unlink(list.files(file.path(tmp, "dados"), full.names = TRUE))
+  salvar_estado(estado_com_base(), file.path(tmp, "dados"))
+  res <- callr::rscript(
+    file.path("scripts", "buscar.R"), cmdargs = "linha_de_base", wd = tmp,
+    env = c(callr::rcmd_safe_env(), REVISAO_FETCHER_FALHA = "1", GITHUB_OUTPUT = ""),
+    fail_on_status = FALSE, show = FALSE
+  )
+  expect_true(res$status != 0)
+})
+
+test_that("test_preparar_material_issue_grande_cai_para_asreview", {
+  cand <- registros_vazio()[rep(NA_integer_, 40), ]
+  cand$openalex_id <- paste0("W", 1:40)
+  cand$titulo <- strrep("x", 3000)
+  expect_error(montar_corpo_issue(cand, "2027-01"), "caracteres")
+  dir <- withr::local_tempdir()
+  m <- preparar_material("issue", cand, "2027-01", dir_triagem = dir)
+  expect_equal(m$destino, "asreview")
+  expect_true(file.exists(m$arquivo))
+  expect_false(file.exists(file.path(dir, "issue-2027-01.md")))
+  # Issue normal continua sendo issue.
+  m2 <- preparar_material("issue", cand[1:2, ], "2027-01", dir_triagem = dir)
+  expect_equal(m2$destino, "issue")
+  expect_true(file.exists(m2$arquivo))
 })

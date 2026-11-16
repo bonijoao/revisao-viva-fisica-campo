@@ -12,6 +12,14 @@ executar_rodada <- function(estado, busca, regras, modo, data,
                             fetcher = openalexR::oa_fetch, limite = 50) {
   data <- as.Date(data)
   rodada <- nome_rodada(modo, data)
+  tem_base <- "linha-de-base" %in% estado$rodadas$rodada
+  if (identical(modo, "mensal") && !tem_base) {
+    stop("A linha de base ainda não foi executada; rode primeiro o modo linha_de_base.", call. = FALSE)
+  }
+  if (identical(modo, "linha_de_base") && nrow(estado$rodadas) > 0) {
+    stop("A linha de base só pode ser executada com rodadas.csv vazio (já há ",
+         nrow(estado$rodadas), " rodada(s)).", call. = FALSE)
+  }
   if (rodada %in% estado$rodadas$rodada) {
     stop("A rodada ", rodada, " já existe em rodadas.csv.", call. = FALSE)
   }
@@ -63,6 +71,32 @@ executar_rodada <- function(estado, busca, regras, modo, data,
   estado$registros <- registros
   estado$rodadas <- tibble::as_tibble(rbind(estado$rodadas, linha))
   list(estado = estado, candidatos = candidatos, destino = destino)
+}
+
+# Grava o material de triagem da rodada. Se o corpo da issue estourar o limite
+# do GitHub, cai para a via ASReview (exportacao CSV).
+# Devolve list(destino, arquivo).
+preparar_material <- function(destino, candidatos, rodada, dir_triagem = "triagem") {
+  if (identical(destino, "issue")) {
+    corpo <- tryCatch(montar_corpo_issue(candidatos, rodada),
+                      error = function(e) {
+                        if (grepl("caracteres (limite", conditionMessage(e), fixed = TRUE)) NULL else stop(e)
+                      })
+    if (!is.null(corpo)) {
+      arquivo <- file.path(dir_triagem, paste0("issue-", rodada, ".md"))
+      escrever_utf8(corpo, arquivo)
+      return(list(destino = "issue", arquivo = arquivo))
+    }
+    message("Corpo da issue acima do limite; usando a via ASReview.")
+    destino <- "asreview"
+  }
+  arquivo <- ""
+  if (identical(destino, "asreview")) {
+    arquivo <- file.path(dir_triagem, "asreview", paste0(rodada, ".csv"))
+    dir.create(dirname(arquivo), showWarnings = FALSE, recursive = TRUE)
+    exportar_asreview(candidatos, arquivo)
+  }
+  list(destino = destino, arquivo = arquivo)
 }
 
 # Atualiza campos de uma rodada existente em `rodadas`.

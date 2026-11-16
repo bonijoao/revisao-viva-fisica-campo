@@ -70,7 +70,7 @@ test_that("test_contagens_iguais_rodadas_csv", {
   fx <- readRDS(file.path("..", "fixtures", "openalex_amostra.rds"))
   busca <- yaml::read_yaml(file.path("..", "..", "protocolo", "busca.yml"))
   regras <- yaml::read_yaml(file.path("..", "..", "protocolo", "regras.yml"))
-  est0 <- list(registros = registros_vazio(), decisoes = decisoes_vazio(), rodadas = rodadas_vazio())
+  est0 <- estado_com_base()
   out <- executar_rodada(est0, busca, regras, modo = "mensal", data = as.Date("2026-12-01"),
                          fetcher = function(...) fx, limite = 50)
   est <- out$estado
