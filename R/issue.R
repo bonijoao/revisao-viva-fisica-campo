@@ -24,9 +24,9 @@ LIMITE_RESUMO_ISSUE <- 1500L
   id <- v("openalex_id")
   titulo <- if (.tem_valor(v("titulo"))) .limpar_titulo(v("titulo")) else "(sem título)"
   ano <- if ("ano" %in% names(cand) && !is.na(cand$ano[i])) paste0(" (", cand$ano[i], ")") else ""
-  fonte <- if (.tem_valor(v("fonte"))) paste0(" — ", .limpar_linha(v("fonte"))) else ""
+  fonte <- if (.tem_valor(v("fonte"))) paste0(" — ", gsub("<!--", "<!-", .limpar_linha(v("fonte")), fixed = TRUE)) else ""
   links <- paste0("[OpenAlex](https://openalex.org/", id, ")")
-  if (.tem_valor(v("doi"))) links <- c(links, paste0("[DOI](https://doi.org/", trimws(v("doi")), ")"))
+  if (.tem_valor(v("doi"))) links <- c(links, paste0("[DOI](https://doi.org/", gsub("<!--", "<!-", trimws(v("doi")), fixed = TRUE), ")"))
   if (.tem_valor(v("url_oa"))) links <- c(links, paste0("[Texto](", gsub("\\s", "", v("url_oa")), ")"))
   res <- v("resumo")
   if (.tem_valor(res)) {
@@ -77,15 +77,22 @@ ler_decisoes_issue <- function(corpo, rodada, data, revisor) {
   ids <- character(); marc <- character()
   for (k in seq_along(inicio)) {
     bloco <- paste(linhas[inicio[k]:fim[k]], collapse = "\n")
-    m <- regmatches(bloco, regexec("<!--\\s*id:\\s*([^\\s>]+?)\\s*-->", bloco, perl = TRUE))[[1]]
-    if (length(m) < 2) next
-    ids <- c(ids, m[2])
+    padrao <- "<!--\\s*id:\\s*([^\\s>]+?)\\s*-->"
+    m <- regmatches(bloco, gregexpr(padrao, bloco, perl = TRUE))[[1]]
+    if (length(m) < 1) next
+    # Vale o ultimo marcador do bloco (o real, gerado depois do titulo/fonte).
+    ids <- c(ids, sub(padrao, "\\1", m[length(m)], perl = TRUE))
     marc <- c(marc, sub("^\\s*- \\[(.)\\].*$", "\\1",linhas[inicio[k]]))
   }
   if (length(ids) == 0) return(decisoes_vazio())
+  # Ids repetidos: qualquer ocorrencia marcada vale incluir.
+  marcado <- marc %in% c("x", "X")
+  ids_u <- unique(ids)
+  incluir <- vapply(ids_u, function(i) any(marcado[ids == i]), logical(1), USE.NAMES = FALSE)
+  ids <- ids_u
   tibble::tibble(
     openalex_id = ids, etapa = "titulo_resumo",
-    decisao = ifelse(marc %in% c("x", "X"), "incluir", "excluir"),
+    decisao = ifelse(incluir, "incluir", "excluir"),
     motivo = NA_character_, via = "issue", rodada = rodada,
     data = data, revisor = revisor
   )

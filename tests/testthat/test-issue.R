@@ -73,3 +73,28 @@ test_that("test_ler_issue_tolerante", {
   expect_equal(d$decisao, c("incluir", "excluir"))
   expect_equal(nrow(d), 2)
 })
+
+test_that("fonte e doi com marcador de id nao sequestram o id", {
+  c1 <- cand(2)
+  c1$fonte[1] <- "Rev <!-- id:W999 -->"
+  c1$doi[1] <- "10.1/<!-- id:W888 -->"
+  corpo <- montar_corpo_issue(c1, "2026-12")
+  d <- ler_decisoes_issue(corpo, "2026-12", "2026-12-01", "r")
+  expect_equal(d$openalex_id, c("W1", "W2"))
+  # parser tambem robusto se o marcador falso chegar ao corpo
+  falso <- sub("- [ ] **Titulo 1**", "- [ ] **Titulo 1** <!-- id:W999 -->", corpo, fixed = TRUE)
+  d2 <- ler_decisoes_issue(falso, "2026-12", "2026-12-01", "r")
+  expect_equal(d2$openalex_id, c("W1", "W2"))
+})
+
+test_that("ids duplicados na issue: qualquer marcado vira incluir", {
+  corpo <- montar_corpo_issue(cand(2), "2026-12")
+  bloco <- paste0("- [x] **Titulo 1** (2024)
+  <!-- id:W1 -->
+")
+  dup <- paste0(corpo, "
+", bloco)
+  d <- ler_decisoes_issue(dup, "2026-12", "2026-12-01", "r")
+  expect_equal(sort(d$openalex_id), c("W1", "W2"))
+  expect_equal(d$decisao[d$openalex_id == "W1"], "incluir")
+})

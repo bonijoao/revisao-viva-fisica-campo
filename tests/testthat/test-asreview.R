@@ -35,3 +35,14 @@ test_that("test_asreview_sem_coluna_rotulo", {
   ex <- tibble::tibble(openalex_id = "W1", titulo_x = "a")
   expect_error(importar_asreview(ex, "W1", "2026-12", "2026-12-05", "r"), "titulo_x")
 })
+
+test_that("sem coluna openalex_id da erro listando colunas", {
+  ex <- tibble::tibble(id_novo = "W1", included = 1)
+  expect_error(importar_asreview(ex, "W1", "2026-12", "2026-12-05", "r"), "id_novo")
+})
+
+test_that("ids_enviados duplicados sao deduplicados", {
+  ex <- tibble::tibble(openalex_id = "W1", included = 1)
+  d <- importar_asreview(ex, c("W1", "W1"), "2026-12", "2026-12-05", "r")
+  expect_equal(nrow(d), 1)
+})

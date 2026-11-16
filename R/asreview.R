@@ -24,6 +24,11 @@ importar_asreview <- function(exportado, ids_enviados, rodada, data, revisor) {
          paste(COLUNAS_ROTULO_ASREVIEW, collapse = ", "), "). Colunas do arquivo: ",
          paste(names(exportado), collapse = ", "), call. = FALSE)
   }
+  if (!"openalex_id" %in% names(exportado)) {
+    stop("O arquivo do ASReview não tem a coluna openalex_id. Colunas do arquivo: ",
+         paste(names(exportado), collapse = ", "), call. = FALSE)
+  }
+  ids_enviados <- unique(as.character(ids_enviados))
   rotulo <- trimws(as.character(exportado[[achada[1]]]))
   rotulo[rotulo %in% c("", "NA")] <- NA_character_
   num <- suppressWarnings(as.numeric(rotulo))
