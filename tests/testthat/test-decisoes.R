@@ -37,3 +37,27 @@ test_that("vigente: empate fica com a ultima, filtra etapa, vazio ok", {
   expect_equal(nrow(e), 0)
   expect_equal(names(e), c("openalex_id", "decisao", "via", "rodada", "data"))
 })
+
+test_that("registrar rejeita data NA, vazia ou fora do formato", {
+  expect_error(registrar_decisoes(decisoes_vazio(), linha_dec("W9", "incluir", data = NA_character_)), "W9")
+  expect_error(registrar_decisoes(decisoes_vazio(), linha_dec("W8", "incluir", data = "")), "W8")
+  expect_error(registrar_decisoes(decisoes_vazio(),
+                                  linha_dec("W7", "incluir", data = "2026-12-01T12:00:00-03:00")), "W7")
+  expect_no_error(registrar_decisoes(decisoes_vazio(),
+                                     linha_dec("W6", "incluir", data = "2026-12-01T12:00:00Z")))
+})
+
+test_that("vigente: data simples vs datetime UTC no mesmo dia", {
+  d <- dplyr::bind_rows(linha_dec("W1", "incluir", "2026-12-01T10:00:00Z", rodada = "r2"),
+                        linha_dec("W1", "excluir", "2026-12-01", rodada = "r1"))
+  expect_equal(decisao_vigente(d)$decisao, "incluir")
+})
+
+test_that("vigente rejeita data NA e ignora etapa NA", {
+  d <- dplyr::bind_rows(linha_dec("W1", "incluir"), linha_dec("W1", "excluir", data = NA_character_))
+  expect_error(decisao_vigente(d), "W1")
+  d2 <- dplyr::bind_rows(linha_dec("W1", "incluir"), linha_dec("W2", "incluir", etapa = NA_character_))
+  v <- decisao_vigente(d2)
+  expect_equal(v$openalex_id, "W1")
+  expect_false(anyNA(v$openalex_id))
+})
