@@ -3,14 +3,23 @@
 # Devolve funcao(registros) -> logical (TRUE = a regra bate).
 .compilar_regra <- function(regra) {
   id <- regra$id
+  if (is.null(id) || !nzchar(as.character(id))) stop("Regra sem id.", call. = FALSE)
   tipo <- regra$tipo
   if (is.null(tipo)) stop("Regra ", id, ": campo 'tipo' ausente.", call. = FALSE)
+  vazio <- function(x) length(x) == 0 || anyNA(x) || any(!nzchar(as.character(x)))
+  exige <- function(campo) {
+    if (vazio(unlist(regra[[campo]]))) {
+      stop("Regra ", id, " (", tipo, "): campo '", campo, "' ausente ou vazio.", call. = FALSE)
+    }
+  }
   switch(tipo,
     tipo_em = {
+      exige("valores")
       valores <- as.character(unlist(regra$valores))
       function(r) !is.na(r$tipo) & r$tipo %in% valores
     },
     nenhum_termo = {
+      exige("campos"); exige("termos")
       campos <- as.character(unlist(regra$campos))
       termos <- normalizar_titulo(as.character(unlist(regra$termos)))
       if (length(termos) == 0 || anyNA(termos) || any(!nzchar(termos))) {
@@ -29,7 +38,11 @@
       }
     },
     ano_menor_que = {
-      valor <- regra$valor
+      exige("valor")
+      valor <- suppressWarnings(as.numeric(regra$valor))
+      if (length(valor) != 1 || is.na(valor)) {
+        stop("Regra ", id, " (ano_menor_que): 'valor' deve ser um número.", call. = FALSE)
+      }
       function(r) !is.na(r$ano) & r$ano < valor
     },
     stop("Regra ", id, ": tipo de regra desconhecido '", tipo, "'.", call. = FALSE)

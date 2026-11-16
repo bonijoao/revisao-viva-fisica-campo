@@ -152,3 +152,31 @@ test_that("test_contagens_rodada_inconsistente", {
   e3 <- est; e3$rodadas <- rbind(est$rodadas, est$rodadas[1, ])
   expect_error(contagens_prisma(e3), "duplicad")
 })
+
+test_that("test_tabela_rodadas_recomputada", {
+  est <- estado_sintetico()
+  # contadores armazenados (zerados/errados) nao devem aparecer na tabela
+  est$rodadas$n_triados <- 99L; est$rodadas$n_incluidos <- 99L; est$rodadas$n_nao_triados_parada <- 99L
+  tab <- tabela_rodadas(est)
+  por <- contagens_por_rodada(est)
+  expect_equal(tab$rodada, c("2026-12", "2027-01"))
+  expect_equal(tab$identificados, vapply(por, function(x) x$identificados, numeric(1)) |> unname())
+  expect_equal(tab$triados, c(2, 1))
+  expect_equal(tab$nao_triados_parada, c(0, 1))
+  expect_equal(tab$incluidos, c(2, 1))
+  expect_equal(tab$para_triagem, c(3, 4))
+  expect_equal(tab$duplicatas, c(1, 1))
+  expect_equal(tab$excluidos_regra, c(1, 0))
+})
+
+test_that("test_contagens_status_invalido", {
+  est <- estado_sintetico()
+  est$registros$status[1] <- "pendente"
+  expect_error(contagens_prisma(est), "status")
+})
+
+test_that("test_contagens_decisao_invalida", {
+  est <- estado_sintetico()
+  est$decisoes$decisao[est$decisoes$openalex_id == "B1"] <- "talvez"
+  expect_error(contagens_prisma(est), "decis")
+})

@@ -17,9 +17,7 @@ desenhar_prisma(contagens)
 if (nrow(estado$rodadas) == 0) {
   cat("Nenhuma rodada executada ainda.\n")
 } else {
-  rod <- estado$rodadas[c("rodada", "data", "modo", "n_identificados", "n_duplicatas",
-                          "n_excluidos_regra", "n_para_triagem", "n_triados",
-                          "n_nao_triados_parada", "n_incluidos", "issue")]
+  rod <- tabela_rodadas(estado)
   knitr::kable(rod, col.names = c("Rodada", "Data", "Modo", "Identificados", "Duplicatas",
                                   "Excluídos por regra", "Para triagem", "Triados",
                                   "Não triados (parada)", "Incluídos", "Issue"))

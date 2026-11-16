@@ -51,3 +51,14 @@ test_that("regra desconhecida e termo vazio geram erro", {
   expect_error(aplicar_regras(reg(), list(list(id = "RY", tipo = "nenhum_termo",
     campos = "titulo", termos = "!!"))), "RY")
 })
+
+test_that("regras com campos obrigatorios ausentes geram erro com o id", {
+  r <- function(...) list(list(id = "RZ", ...))
+  expect_error(aplicar_regras(reg(), r(tipo = "tipo_em")), "RZ")
+  expect_error(aplicar_regras(reg(), r(tipo = "tipo_em", valores = list())), "RZ")
+  expect_error(aplicar_regras(reg(), r(tipo = "nenhum_termo", termos = "a")), "RZ")
+  expect_error(aplicar_regras(reg(), r(tipo = "nenhum_termo", campos = "titulo")), "RZ")
+  expect_error(aplicar_regras(reg(), r(tipo = "ano_menor_que")), "RZ")
+  expect_error(aplicar_regras(reg(), r(tipo = "ano_menor_que", valor = "x")), "RZ")
+  expect_error(aplicar_regras(reg(), list(list(tipo = "tipo_em", valores = "a"))), "sem id|id")
+})

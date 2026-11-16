@@ -5,5 +5,5 @@ Authors@R: person("João Paulo", "Assis Bonifácio", role = c("aut","cre"))
 Description: Pipeline de revisao sistematica viva: busca no OpenAlex,
     deduplicacao, regras de exclusao, triagem humana e site Quarto.
 Encoding: UTF-8
-Imports: tibble, openalexR, PRISMA2020, dplyr, readr, yaml, stringi, digest, purrr, tidyr, ggplot2, DT, jsonlite
+Imports: tibble, openalexR, PRISMA2020, dplyr, readr, yaml, stringi, digest, purrr, tidyr, ggplot2, DT, jsonlite, knitr, rmarkdown
 Suggests: testthat, withr, callr

@@ -35,7 +35,9 @@ somar_contagens <- function(lista) {
     CONTAGENS_CAMPOS))
 }
 
-contagens_prisma <- function(estado) {
+# Valida o estado e devolve as contagens de cada rodada (lista nomeada, em
+# ordem cronologica). Base unica de contagens_prisma e da tabela do site.
+contagens_por_rodada <- function(estado) {
   if (anyDuplicated(estado$rodadas$rodada)) {
     stop("rodadas duplicadas em rodadas.csv: ",
          paste(unique(estado$rodadas$rodada[duplicated(estado$rodadas$rodada)]), collapse = ", "), call. = FALSE)
@@ -47,11 +49,25 @@ contagens_prisma <- function(estado) {
     stop("registros com rodada_identificacao ausente de rodadas.csv: ",
          paste(orfas, collapse = ", "), call. = FALSE)
   }
+  st_ruim <- setdiff(unique(estado$registros$status), c("para_triagem", "duplicata", "excluido_regra"))
+  if (length(st_ruim) > 0) {
+    stop("registros com status inválido: ", paste(st_ruim, collapse = ", "),
+         " (esperado: para_triagem, duplicata, excluido_regra)", call. = FALSE)
+  }
   rod <- estado$rodadas
   rod <- rod[order(rod$data, seq_len(nrow(rod))), , drop = FALSE]
   vig <- decisao_vigente(estado$decisoes, "titulo_resumo")
-  por_rodada <- lapply(stats::setNames(rod$rodada, rod$rodada),
-                       function(r) contagens_rodada(estado$registros, vig, r))
+  dec_ruim <- setdiff(unique(vig$decisao), c("incluir", "excluir", "nao_triado_parada"))
+  if (length(dec_ruim) > 0) {
+    stop("decisão inválida em decisoes.csv: ", paste(dec_ruim, collapse = ", "),
+         " (esperado: incluir, excluir, nao_triado_parada)", call. = FALSE)
+  }
+  lapply(stats::setNames(rod$rodada, rod$rodada),
+         function(r) contagens_rodada(estado$registros, vig, r))
+}
+
+contagens_prisma <- function(estado) {
+  por_rodada <- contagens_por_rodada(estado)
   k <- length(por_rodada)
   nova <- if (k > 0) por_rodada[[k]] else contagens_zeradas()
   anterior <- somar_contagens(if (k > 1) por_rodada[-k] else list())
@@ -59,6 +75,23 @@ contagens_prisma <- function(estado) {
                          n = unname(vapply(por_rodada, function(x) as.numeric(x$aguardando), numeric(1))))
   pend <- pend[pend$n > 0, , drop = FALSE]
   list(anterior = anterior, nova = nova, pendentes = pend)
+}
+
+# Tabela de rodadas do site: contagens recomputadas (nao os contadores
+# armazenados em rodadas.csv); data, modo e issue vem de rodadas.csv.
+tabela_rodadas <- function(estado) {
+  por <- contagens_por_rodada(estado)
+  rod <- estado$rodadas
+  rod <- rod[order(rod$data, seq_len(nrow(rod))), , drop = FALSE]
+  g <- function(k) unname(vapply(por, function(x) as.numeric(x[[k]]), numeric(1)))
+  tibble::tibble(
+    rodada = rod$rodada, data = rod$data, modo = rod$modo,
+    identificados = g("identificados"), duplicatas = g("duplicatas"),
+    excluidos_regra = g("excluidos_regra"),
+    para_triagem = g("identificados") - g("duplicatas") - g("excluidos_regra"),
+    triados = g("triados"), nao_triados_parada = g("nao_triados_parada"),
+    incluidos = g("incluidos"), issue = rod$issue
+  )
 }
 
 # Campos e textos (em portugues) passados ao PRISMA2020::PRISMA_flowdiagram.
